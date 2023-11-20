@@ -1,0 +1,172 @@
+From 3458d539e059dd12bd8023d9abd6ff4e556f7582 Mon Sep 17 00:00:00 2001
+From: Samy Francelet <samy.francelet@ik.me>
+Date: Sun, 29 Oct 2023 01:56:45 +0200
+Subject: [PATCH] stack-protection-strong
+
+---
+ Makefile             |  5 +++++
+ cmd/Kconfig          | 10 ++++++++++
+ cmd/Makefile         |  1 +
+ cmd/stackprot_test.c | 16 ++++++++++++++++
+ common/Kconfig       | 17 +++++++++++++++++
+ common/Makefile      |  1 +
+ common/stackprot.c   | 16 ++++++++++++++++
+ scripts/Makefile.spl |  6 ++++++
+ 8 files changed, 72 insertions(+)
+ create mode 100644 cmd/stackprot_test.c
+ create mode 100644 common/stackprot.c
+
+diff --git a/Makefile b/Makefile
+index dd98b430..96ba29b9 100644
+--- a/Makefile
++++ b/Makefile
+@@ -677,7 +677,12 @@ else
+ KBUILD_CFLAGS	+= -O2
+ endif
+ 
++ifeq ($(CONFIG_STACKPROTECTOR),y)
++KBUILD_CFLAGS += $(call cc-option,-fstack-protector-strong)
++CFLAGS_EFI += $(call cc-option,-fno-stack-protector)
++else
+ KBUILD_CFLAGS += $(call cc-option,-fno-stack-protector)
++endif
+ KBUILD_CFLAGS += $(call cc-option,-fno-delete-null-pointer-checks)
+ 
+ # disable stringop warnings in gcc 8+
+diff --git a/cmd/Kconfig b/cmd/Kconfig
+index 0c984d73..0714e407 100644
+--- a/cmd/Kconfig
++++ b/cmd/Kconfig
+@@ -2285,6 +2285,16 @@ config CMD_AVB
+ 	    avb read_part_hex - read data from partition and output to stdout
+ 	    avb write_part - write data to partition
+ 	    avb verify - run full verification chain
++
++config CMD_STACKPROTECTOR_TEST
++	bool "Enable the 'stackprotector test' command"
++	depends on STACKPROTECTOR
++	default n
++	help
++		Enable stackprot_test command
++		The stackprot_test command will force a stack overrun to test
++		the stack smashing detection mechanisms.
++		
+ endmenu
+ 
+ config CMD_UBI
+diff --git a/cmd/Makefile b/cmd/Makefile
+index 3a9c9747..f2e4ae35 100644
+--- a/cmd/Makefile
++++ b/cmd/Makefile
+@@ -137,6 +137,7 @@ obj-$(CONFIG_CMD_SPI) += spi.o
+ obj-$(CONFIG_CMD_STRINGS) += strings.o
+ obj-$(CONFIG_CMD_SMC) += smccc.o
+ obj-$(CONFIG_CMD_SYSBOOT) += sysboot.o pxe_utils.o
++obj-$(CONFIG_CMD_STACKPROTECTOR_TEST) += stackprot_test.o
+ obj-$(CONFIG_CMD_TERMINAL) += terminal.o
+ obj-$(CONFIG_CMD_TIME) += time.o
+ obj-$(CONFIG_CMD_TRACE) += trace.o
+diff --git a/cmd/stackprot_test.c b/cmd/stackprot_test.c
+new file mode 100644
+index 00000000..68c681d0
+--- /dev/null
++++ b/cmd/stackprot_test.c
+@@ -0,0 +1,16 @@
++#include <common.h>
++#include <command.h>
++
++DECLARE_GLOBAL_DATA_PTR;
++
++static int do_test_stackprot_fail(struct cmd_tbl *cmdtp, int flag,
++    int argc, char *const agrv[])
++{
++    char a[128];
++
++    memset(a, 0xa5, 512);
++    return 0;
++}
++
++U_BOOT_CMD(stackprot_test, 1, 1, do_test_stackprot_fail,
++    "test stack protector with buffer overflow", "");
+\ No newline at end of file
+diff --git a/common/Kconfig b/common/Kconfig
+index b1934b3a..b10ef4a0 100644
+--- a/common/Kconfig
++++ b/common/Kconfig
+@@ -1046,6 +1046,23 @@ config TPL_HASH
+ 	  and the algorithms it supports are defined in common/hash.c. See
+ 	  also CMD_HASH for command-line access.
+ 
++config STACKPROTECTOR
++	bool "Stack Protector buffer overflow detection"
++	default n
++	help
++		Enable stack smash detection through the compiler's built-in
++		stack-protector canary logic
++
++config SPL_STACKPROTECTOR
++	bool "Stack Protector buffer overflow detection for SPL"
++	depends on STACKPROTECTOR && SPL
++	default n
++
++config TPL_STACKPROTECTOR
++	bool "Stack Protector buffer overflow detection for TPL"
++	depends on STACKPROTECTOR && TPL
++	default n
++
+ endmenu
+ 
+ menu "Update support"
+diff --git a/common/Makefile b/common/Makefile
+index 2e7a0905..0bcbbf7f 100644
+--- a/common/Makefile
++++ b/common/Makefile
+@@ -139,3 +139,4 @@ obj-$(CONFIG_CMD_LOADB) += xyzModem.o
+ obj-$(CONFIG_$(SPL_TPL_)YMODEM_SUPPORT) += xyzModem.o
+ 
+ obj-$(CONFIG_AVB_VERIFY) += avb_verify.o
++obj-$(CONFIG_$(SPL_TPL_)STACKPROTECTOR) += stackprot.o
+\ No newline at end of file
+diff --git a/common/stackprot.c b/common/stackprot.c
+new file mode 100644
+index 00000000..7027d1cd
+--- /dev/null
++++ b/common/stackprot.c
+@@ -0,0 +1,16 @@
++#include <common.h>
++#include <asm/global_data.h>
++
++DECLARE_GLOBAL_DATA_PTR;
++
++unsigned long __stack_chk_guard = (long)(0xfeedf00ddeadbeef & ~0UL);
++
++void __stack_chk_fail(void)
++{
++    void *ra;
++
++    ra = __builtin_extract_return_addr(__builtin_return_address(0));
++
++    panic("Stack smashing detected !\nIn function: %p relocated from %p",
++        ra, ra - gd->reloc_off);
++}
+\ No newline at end of file
+diff --git a/scripts/Makefile.spl b/scripts/Makefile.spl
+index d528c994..f7d7ddb9 100644
+--- a/scripts/Makefile.spl
++++ b/scripts/Makefile.spl
+@@ -63,6 +63,12 @@ include $(srctree)/scripts/Makefile.lib
+ KBUILD_CFLAGS += -ffunction-sections -fdata-sections
+ LDFLAGS_FINAL += --gc-sections
+ 
++ifeq ($(CONFIG_$(SPL_TPL_)STACKPROTECTOR),y)
++KBUILD_CFLAGS += -fstack-protector-strong
++else
++KBUILD_CFLAGS += -fno-stack-protector
++endif
++
+ # FIX ME
+ cpp_flags := $(KBUILD_CPPFLAGS) $(PLATFORM_CPPFLAGS) $(UBOOTINCLUDE) \
+ 							$(NOSTDINC_FLAGS)
+-- 
+2.38.1
+

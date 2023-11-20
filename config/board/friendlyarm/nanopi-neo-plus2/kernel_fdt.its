@@ -1,0 +1,43 @@
+/dts-v1/;
+/ {
+    description = "FIT file with kernel and flattened device tree";
+    #address-cells = <1>;
+
+    images {
+        kernel {
+            description = "Linux 6.3.6 kernel";
+            data = /incbin/("./Image");
+            type = "kernel";
+            arch = "arm64";
+            os = "linux";
+            compression = "none";
+            load = <0x40080000>;
+            entry = <0x40080000>;
+            hash-1 {
+                algo = "sha512";
+            };
+        };
+
+        fdt {
+            description = "Flattened Device Tree blob";
+            data = /incbin/("./sun50i-h5-nanopi-neo-plus2.dtb");
+            type = "flat_dt";
+            arch = "arm64";
+            compression = "none";
+            load = <0x4fa00000>;
+            entry = <0x4fa00000>;
+            hash-1 {
+                algo = "sha512";
+            };
+        };
+    };
+
+    configurations {
+        default = "default";
+        default {
+            description = "Boot Linux kernel with fdt blob";
+            kernel = "kernel";
+            fdt = "fdt";
+        };
+    };
+};
