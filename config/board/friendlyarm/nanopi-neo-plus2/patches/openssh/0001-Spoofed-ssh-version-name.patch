@@ -1,0 +1,24 @@
+From 42f121fa662811d7c70c1aeb620f8d3941a14daf Mon Sep 17 00:00:00 2001
+From: Samy Francelet <samy.francelet@ik.me>
+Date: Thu, 11 Jan 2024 17:10:54 +0100
+Subject: [PATCH] Spoofed ssh version name
+
+---
+ version.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/version.h b/version.h
+index e5b1e71..43ff0d1 100644
+--- a/version.h
++++ b/version.h
+@@ -1,6 +1,6 @@
+ /* $OpenBSD: version.h,v 1.98 2023/08/10 01:01:07 djm Exp $ */
+ 
+-#define SSH_VERSION	"OpenSSH_9.4"
++#define SSH_VERSION	"My_super_SecureShell"
+ 
+ #define SSH_PORTABLE	"p1"
+ #define SSH_RELEASE	SSH_VERSION SSH_PORTABLE
+-- 
+2.38.1
+

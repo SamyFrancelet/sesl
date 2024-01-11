@@ -11,7 +11,7 @@
 # default value.
 
 #Port 22
-#AddressFamily any
+AddressFamily inet
 #ListenAddress 0.0.0.0
 #ListenAddress ::
 
@@ -21,6 +21,7 @@
 
 # Ciphers and keying
 #RekeyLimit default none
+Ciphers aes128-ctr,aes192-ctr,aes256-ctr
 
 # Logging
 #SyslogFacility AUTH
@@ -82,7 +83,7 @@ PermitEmptyPasswords yes
 # and KbdInteractiveAuthentication to 'no'.
 #UsePAM no
 
-#AllowAgentForwarding yes
+AllowAgentForwarding no
 #AllowTcpForwarding yes
 #GatewayPorts no
 #X11Forwarding no
@@ -104,7 +105,7 @@ PermitEmptyPasswords yes
 #VersionAddendum none
 
 # no default banner path
-#Banner none
+Banner /etc/ssh/banner
 
 # override default of no subsystems
 Subsystem	sftp	/usr/libexec/sftp-server
