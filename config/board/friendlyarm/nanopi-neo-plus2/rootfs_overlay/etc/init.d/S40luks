@@ -1,0 +1,7 @@
+#!/bin/sh
+
+/usr/sbin/cryptsetup open --type luks --key-file=/luks_pw /dev/mmcblk0p3 luks_rootfs
+/bin/mkdir -p /luks
+/bin/mount /dev/mapper/luks_rootfs /luks
+
+printf "rootfs.luks.ext4: mounted on /luks\n"
