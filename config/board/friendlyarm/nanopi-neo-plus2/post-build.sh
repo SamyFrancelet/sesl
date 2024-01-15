@@ -19,4 +19,25 @@ cp $IMAGES_DIR/Image.itb /mnt
 cp $IMAGES_DIR/boot.scr /mnt
 umount /mnt
 
+# Generate LUKS image
+cp $BOARD_DIR/rootfs_overlay/luks_pw $IMAGES_DIR/
+hexdump $IMAGES_DIR/luks_pw
+dd if=/dev/zero of=$IMAGES_DIR/rootfs.luks.ext4 bs=2147483648 count=1
+echo "YES" | cryptsetup --pbkdf pbkdf2 luksFormat $IMAGES_DIR/rootfs.luks.ext4 $IMAGES_DIR/luks_pw
+
+# Create mapping, format LUKS partition and insert rootfs.ext4 into LUKS image
+cryptsetup open --type luks --key-file=/$IMAGES_DIR/luks_pw $IMAGES_DIR/rootfs.luks.ext4 rootfs
+mkfs.ext4 -L luks /dev/mapper/rootfs
+mount /dev/mapper/rootfs /mnt/
+cp -r $IMAGES_DIR/rootfs.ext4 /mnt
+umount /mnt/
+cryptsetup close rootfs
+
+# Generate btrfs image
+#dd if=/dev/zero of=/buildroot/output/images/cow.btrfs bs=1024 count=400k
+#mkfs.btrfs -L btrfs /buildroot/output/images/cow.btrfs
+
+# Generate f2fs image
+#dd if=/dev/zero of=/buildroot/output/images/log.f2fs bs=1024 count=400k
+#mkfs.f2fs -l f2fs /buildroot/output/images/log.f2fs
 
